@@ -1,0 +1,166 @@
+Function ML_trim_walks_futura_data_query(make As String, model As String, datefrom, car_or_van As String) As String
+
+Dim query As String
+
+query = "select "
+query = query & "  a.f_veh_code, "
+query = query & "  a.f_veh_date_end, "
+query = query & "  f.f_ma_name, "
+query = query & "  e.f_mo_name, "
+query = query & "  replace(a.f_veh_mask_trim, '!', '') as f_veh_mask_trim, "
+query = query & "  c.f_ft_long_desc, "
+query = query & "  d.f_bs_long_desc, "
+query = query & "  a.f_veh_mk_number || ',' || a.f_veh_mk_series as M_S, "
+query = query & "  g.drive_train, "
+query = query & "  a.f_veh_power_bhp, "
+query = query & "  b.f_tr_long_desc, "
+query = query & "  replace( replace( replace( replace(a.f_veh_equipment, '!', '') , '/', '') , '[', '(' ) , ']', ')') as f_veh_equipment, "
+query = query & "  a.f_veh_nbr_doors "
+query = query & "from "
+query = query & "  tv_veh_static a "
+query = query & "Left Join "
+query = query & "  tv_transmission b "
+query = query & "  on "
+query = query & "    b.f_tr_code = a.f_veh_tr_code "
+query = query & "Left Join "
+query = query & "  tv_fuel_type c "
+query = query & "  on "
+query = query & "    c.f_ft_code = a.f_veh_ft_code "
+query = query & "Left Join "
+query = query & "  tv_body_style d "
+query = query & "  on "
+query = query & "    d.f_bs_code = a.f_veh_bs_code "
+query = query & "Left Join "
+query = query & "  tv_models e "
+query = query & "  on "
+query = query & "    e.f_mo_ma_code = a.f_veh_ma_code "
+query = query & "    and "
+query = query & "    e.f_mo_code = a.f_veh_mo_code "
+query = query & "Left Join "
+query = query & "  tv_manufacturer f "
+query = query & "  on "
+query = query & "    f.f_ma_code = e.f_mo_ma_code "
+query = query & "Left Join "
+query = query & "  v_oop_vehicles g "
+query = query & "  on "
+query = query & "    g.f_veh_code = a.f_veh_code "
+query = query & "where "
+query = query & "  f.f_ma_name = "
+query = query & "'" & make & "' "
+query = query & "  and "
+query = query & "  e.f_mo_name = "
+query = query & "'" & model & "' "
+query = query & "  and "
+query = query & "  a.f_veh_date_end >= to_date( "
+query = query & "'" & datefrom & "','dd/mm/yyyy') "
+query = query & "  and "
+query = query & "  a.f_veh_ct_code = "
+query = query & car_or_van
+
+ML_trim_walks_futura_data_query = query
+
+End Function
+
+Function ML_trim_walk_item_query(item As String, collection As String, sheetname As String) As String
+
+Dim query As String
+Dim fieldName As String
+
+If collection = "Bodies" Then
+    fieldName = "F_BS_LONG_DESC"
+End If
+If collection = "Trans" Then
+    fieldName = "F_TR_LONG_DESC"
+End If
+If collection = "Trains" Then
+    fieldName = "DRIVE_TRAIN"
+End If
+If collection = "Trims" Then
+    fieldName = "F_VEH_MASK_TRIM"
+End If
+If collection = "Packs" Then
+    fieldName = "F_VEH_EQUIPMENT"
+End If
+If collection = "Fuels" Then
+    fieldName = "F_FT_LONG_DESC"
+End If
+If collection = "Trans_BHP" Then
+    fieldName = "F_TR_LONG_DESC & ' ' & F_VEH_POWER_BHP"
+End If
+
+query = "SELECT m.* FROM ["
+query = query & sheetname
+query = query & "$] m "
+query = query & "WHERE m."
+query = query & fieldName
+query = query & " = '"
+query = query & item
+query = query & "'"
+
+ML_trim_walk_item_query = query
+
+End Function
+
+Function ML_RV_comparison_query(item As String, collection As String, sheetname As String, CompFieldName As String) As String
+
+Dim query As String
+Dim cleanedItem As String
+
+cleanedItem = WorksheetFunction.Substitute(item, ".", "point")
+cleanedItem = WorksheetFunction.Substitute(cleanedItem, "[", "")
+cleanedItem = WorksheetFunction.Substitute(cleanedItem, "]", "")
+
+If collection = "Bodies" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & cleanedItem & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_TR_LONG_DESC = t1.F_TR_LONG_DESC AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Trans" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & cleanedItem & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Trains" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & cleanedItem & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_TR_LONG_DESC = t1.F_TR_LONG_DESC AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Trims" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & cleanedItem & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_TR_LONG_DESC = t1.F_TR_LONG_DESC AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Packs" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & cleanedItem & "]"
+    query = WorksheetFunction.Substitute(query, "[]", "[No Pack]")
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_TR_LONG_DESC = t1.F_TR_LONG_DESC AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Fuels" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & item & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_POWER_BHP = t1.F_VEH_POWER_BHP AND fd.F_TR_LONG_DESC = t1.F_TR_LONG_DESC AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+If collection = "Trans_BHP" Then
+    query = "SELECT fd.[" & CompFieldName & "] - t1.[" & CompFieldName & "] as "
+    query = query & "[" & item & "]"
+    query = query & " FROM "
+    query = query & "[" & sheetname & "$] "
+    query = query & "fd LEFT JOIN [Temp1$] t1 ON fd.F_MA_NAME = t1.F_MA_NAME AND fd.F_MO_NAME = t1.F_MO_NAME AND fd.F_VEH_MASK_TRIM = t1.F_VEH_MASK_TRIM AND fd.F_FT_LONG_DESC = t1.F_FT_LONG_DESC AND fd.F_BS_LONG_DESC = t1.F_BS_LONG_DESC AND fd.M_S = t1.M_S AND fd.DRIVE_TRAIN = t1.DRIVE_TRAIN AND fd.F_VEH_EQUIPMENT = t1.F_VEH_EQUIPMENT AND fd.F_VEH_NBR_DOORS = t1.F_VEH_NBR_DOORS ORDER BY fd.ROW_NUM"
+End If
+
+ML_RV_comparison_query = query
+
+End Function
