@@ -1,0 +1,102 @@
+Function remove_sql_punctuation(sheetname As String, Optional leave_square_bracets As Boolean) As String
+    
+    Dim invalid_chars(1 To 8) As String
+    Dim new_sheetname As String
+    
+    invalid_chars(1) = "\"
+    invalid_chars(2) = "/"
+    invalid_chars(3) = "*"
+    invalid_chars(4) = "?"
+    invalid_chars(5) = ":"
+    invalid_chars(8) = "!"
+    
+    If leave_square_brackets = False Then
+        invalid_chars(6) = "["
+        invalid_chars(7) = "]"
+    End If
+    
+    new_sheetname = sheetname
+    
+    For i = 1 To 8
+        new_sheetname = WorksheetFunction.Substitute(new_sheetname, invalid_chars(i), "")
+    Next i
+    
+    remove_sql_punctuation = new_sheetname
+    
+End Function
+
+Function mVars(variable As String)
+    
+    mVars = ActiveWorkbook.Sheets("Macro Variables").Cells.Find(What:=variable, after:=Range("A1"), LookAt:=xlWhole, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=True).Offset(0, 1).Value
+    
+End Function
+
+Function car_van() As String
+    
+    car_van = "'C'"
+    
+End Function
+
+Sub sql_to_excel(sql_query As String, database As String, Optional append_or_create As Boolean = True, Optional sheet_name As String = "query_data", Optional after_column As Long = 0, Optional after_row As Long = 0)
+    
+    Dim rst         As New ADODB.Recordset
+    Dim cnn         As New ADODB.Connection
+    Dim ML          As Workbook
+    Dim data        As Worksheet
+    Dim query_data  As Worksheet
+    Dim database_connection As String
+    Dim server      As String
+    Dim login       As String
+    Dim password    As String
+    Dim i           As Long
+    
+    Set ML = ActiveWorkbook
+    Set data = ML.ActiveSheet
+    
+    If append_or_create = True Then
+        Set query_data = ML.Sheets.Add
+        query_data.Name = sheet_name
+    Else
+        Set query_data = ML.Sheets(sheet_name)
+    End If
+    
+    If database = "excel" Then
+        database_connection = "Provider=Microsoft.ACE.OLEDB.12.0;Password="""";User ID=Admin;Data Source=" & ThisWorkbook.FullName & ";Mode=Share Deny None;Extended Properties=""Excel 12.0;HDR=Yes"";"
+    Else
+        server = db_server(database)
+        login = db_username(database)
+        password = db_password(database)
+        
+        database_connection = "Provider = MSDAORA.1; User ID = xLOGINx; Password = xPASSWORDx;Persist Security Info=True;Data Source = xSERVERx"
+        database_connection = Replace(database_connection, "xSERVERx", server)
+        database_connection = Replace(database_connection, "xLOGINx", login)
+        database_connection = Replace(database_connection, "xPASSWORDx", password)
+    End If
+    
+    cnn.Open database_connection
+    rst.Open sql_query, cnn, adOpenStatic
+    query_data.Cells(after_row + 2, after_column + 1).CopyFromRecordset rst
+    For i = 1 To rst.Fields.count
+        query_data.Cells(after_row + 1, after_column + i).Value = rst.Fields(i - 1).Name
+    Next i
+    cnn.Close
+    
+End Sub
+
+Sub Conditional_Formatting_Walks()
+    
+    Dim ws          As Worksheet
+    Dim trim_desc_col As Long
+    Dim Lastcol     As Long
+    Dim lastrow     As Long
+    
+    Set ws = ActiveSheet
+    trim_desc_col = Functions.col_ref(ws, "F_VEH_MASK_TRIM", , False, True)
+    Lastcol = ws.Cells(1, Columns.count).End(xlToLeft).Column
+    lastrow = ws.Cells(Rows.count, "A").End(xlUp).row
+    
+    With ws.Range(Cells(2, 1).Address, Cells(lastrow, Lastcol).Address).FormatConditions.Add(Type:=xlExpression, Formula1:="=$" & Functions.ColumnLetter(trim_desc_col) & "2<>$" & Functions.ColumnLetter(trim_desc_col) & 3)
+        .Borders(xlEdgeBottom).Color = RGB(255, 0, 0)
+    End With
+    
+End Sub
