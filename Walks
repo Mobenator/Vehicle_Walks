@@ -1,0 +1,605 @@
+Sub Trim_Walks_ML()
+    
+    Dim rst             As New ADODB.Recordset
+    Dim cnn             As New ADODB.Connection
+    Dim ML              As Workbook
+    Dim data            As Worksheet
+    Dim DataV           As Worksheet
+    Dim FD              As Worksheet
+    Dim Temp1           As Worksheet
+    Dim RVs             As Worksheet
+    Dim Vars            As New collection
+    Dim CF              As Range
+    Dim strquery        As String
+    Dim MakeSel         As String
+    Dim ModSel          As String
+    Dim i               As Long
+    Dim c               As Long
+    Dim lastrow         As Long
+    Dim toprow          As Long
+    Dim headrow         As Long
+    Dim Col             As Long
+    Dim ColNum          As Long
+    Dim CCcol           As Long
+    Dim C1              As Long
+    Dim C2              As Long
+    Dim C3              As Long
+    Dim C4              As Long
+    Dim C5              As Long
+    Dim DupeRng         As Range
+    Dim fromDate        As Date
+    Dim sheetname       As String
+    Dim EV              As Boolean
+    Dim RV_walk         As Boolean
+    Dim BB_walk         As Boolean
+    Dim CompFieldName   As String
+    Dim startingTime    As Long
+    
+    Application.Calculation = xlCalculationManual
+    
+    If vbYes = MsgBox("CAP Check walks?", vbQuestion + vbYesNo + vbDefaultButton2, "Choose walks") Then
+        RV_walk = True
+    Else
+        RV_walk = False
+    End If
+    If vbYes = MsgBox("BB / RB walks?", vbQuestion + vbYesNo + vbDefaultButton2, "Choose walks") Then
+        BB_walk = True
+    Else
+        BB_walk = False
+    End If
+    If RV_walk = False And BB_walk = False Then
+        MsgBox ("Neither walk selected, process aborted.")
+        Application.Calculation = xlCalculationAutomatic
+        Exit Sub
+    End If
+    If RV_walk = True And BB_walk = True Then
+        MsgBox ("Only one walk can be executed at a time.")
+        Application.Calculation = xlCalculationAutomatic
+        Exit Sub
+    End If
+    
+    startingTime = Timer
+    
+    Set ML = ActiveWorkbook
+    Set DataV = ML.Sheets("Data Variables")
+    If Left(ML.ActiveSheet.Name, 2) = "ML" Or ML.ActiveSheet.Name = "WW" Then
+        Set data = ML.ActiveSheet
+    Else
+        MsgBox ("Trim walks only works in ML Or WW")
+        Application.Calculation = xlCalculationAutomatic
+        Exit Sub
+    End If
+    If Right(ML.ActiveSheet.Name, 2) = "EV" Then
+        EV = True
+    Else
+        EV = False
+    End If
+    Set RVs = ML.Worksheets("RVs")
+    
+    If data.Name = "WW" Then
+        MakeSel = data.Cells.Find(What:="1 Make", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Offset(1, 0).Value
+        ModSel = data.Cells.Find(What:="2 Model", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Offset(1, 0).Value
+    Else
+        If vbYes = MsgBox("Use active row vehicle?", vbQuestion + vbYesNo + vbDefaultButton2, "Choose vehicle") Then
+            MakeSel = data.Cells(ActiveCell.row, data.Cells.Find(What:="1 Make", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Column).Value
+            ModSel = data.Cells(ActiveCell.row, data.Cells.Find(What:="2 Model", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Column).Value
+        Else
+            MakeSel = InputBox("Select Manufactuer", "Manufacturer Selection")
+            If MakeSel = "" Then
+                MsgBox ("No manufactuer selected, exiting macro.")
+                Application.Calculation = xlCalculationAutomatic
+                Exit Sub
+            End If
+            
+            ModSel = InputBox("Select Model", "Model Selection")
+            If ModSel = "" Then
+                MsgBox ("No model selected, exiting macro.")
+                Application.Calculation = xlCalculationAutomatic
+                Exit Sub
+            End If
+        End If
+    End If
+    
+    startingTime = Timer
+    
+    sheetname = Functions.remove_sql_punctuation(MakeSel & " " & ModSel & " Data")
+    sheetname = Left(sheetname, 30)
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    C1 = data.Cells.Find("Futura Code", SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    
+    If RV_walk Then
+        CompFieldName = "CAP Check"
+        C3 = data.Cells.Find("CAP Check MRP", SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    End If
+    If BB_walk Then
+        If EV Then
+            CompFieldName = "36 30k"
+        Else
+            CompFieldName = "36 60k"
+        End If
+        C3 = data.Cells.Find("% MRP", SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    End If
+    
+    C2 = data.Cells.Find(CompFieldName, SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    C4 = data.Cells.Find("UCV", LookAt:=xlWhole, SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    C5 = data.Cells.Find("MRP", SearchOrder:=xlByRows, SearchDirection:=xlNext).Column
+    
+    lastrow = data.Cells.Find(What:="*", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlPrevious, MatchCase:=False).row
+    
+    RVs.Cells.Clear
+    
+    RVs.Range("A1:A" & lastrow - 1).Value = data.Range(Cells(2, C1).Address, Cells(lastrow, C1).Address).Value
+    RVs.Range("B1:B" & lastrow - 1).Value = data.Range(Cells(2, C2).Address, Cells(lastrow, C2).Address).Value
+    RVs.Range("C1:C" & lastrow - 1).Value = data.Range(Cells(2, C3).Address, Cells(lastrow, C3).Address).Value
+    RVs.Range("D1:D" & lastrow - 1).Value = data.Range(Cells(2, C4).Address, Cells(lastrow, C4).Address).Value
+    RVs.Range("E1:E" & lastrow - 1).Value = data.Range(Cells(2, C5).Address, Cells(lastrow, C5).Address).Value
+    
+    For Each sheet In ML.Worksheets
+        If sheet.Name = sheetname Then
+            sheet.Delete
+        End If
+    Next sheet
+    
+    Set FD = ML.Worksheets.Add
+    Set Temp1 = ML.Worksheets.Add
+    FD.Name = Functions.remove_sql_punctuation(sheetname)
+    Temp1.Name = "Temp1"
+    
+    CCcol = data.Cells.Find(What:=CompFieldName, after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Column
+    
+    If RV_walk Then
+        fromDate = Functions.mVars("precurrent_date")
+    End If
+    If BB_walk Then
+        fromDate = Functions.mVars("include_date")
+    End If
+    
+    headrow = data.Cells.Find(What:="Futura Code", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).row
+    toprow = headrow + 1
+    Col = data.Cells.Find(What:="Futura Code", after:=Range("A1"), LookAt:=xlPart, LookIn:=xlValues, SearchOrder:=xlByRows, SearchDirection:=xlForward, MatchCase:=False).Column
+    
+    ' Pull data from Futura
+    
+    strquery = Queries.ML_trim_walks_futura_data_query(MakeSel, ModSel, fromDate, Functions.car_van)
+    
+    Call Functions.sql_to_excel(strquery, "futura", False, FD.Name)
+    
+    ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    lastrow = FD.Cells(headrow, 1).End(xlDown).row
+    
+    ' Add row_num to futura data
+    
+    FD.Cells(1, ColNum + 1).Value = "ROW_NUM"
+    FD.Range(Cells(2, ColNum + 1).Address, Cells(lastrow, ColNum + 1).Address).Formula = "=ROW()"
+    FD.Range(Cells(2, ColNum + 1).Address, Cells(lastrow, ColNum + 1).Address).Value = FD.Range(Cells(2, ColNum + 1).Address, Cells(lastrow, ColNum + 1).Address).Value
+    
+    ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    ' get comparison field
+    
+    strquery = "SELECT rv.[" & CompFieldName & "] FROM [" & sheetname & "$] fd LEFT JOIN [RVs$] rv ON rv.[Futura Code] = fd.F_VEH_CODE ORDER BY fd.ROW_NUM"
+    
+    Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+    
+    ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    ' remove futura code and end date from futura data
+    
+    FD.Range("A:B").Delete
+    
+    FD.Range(Cells(1, 1).Address, Cells(lastrow, ColNum - 2).Address).RemoveDuplicates Columns:=Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), Header:=xlYes
+    
+    ' copy futura data for collection creater
+    
+    strquery = "select *, ( F_TR_LONG_DESC & ' ' & F_VEH_POWER_BHP ) as Trans_BHP from ['" & sheetname & "$']"
+    
+    Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+    
+    ColNum = Temp1.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    ' create unique list of variables for collections
+    
+    j = 1
+    
+    Do Until j = ColNum
+        
+        If FD.Cells(1, j).Value <> CompFieldName Then
+            lastrow = FD.Cells(FD.Rows.count, j).End(xlUp).row
+            'Temp1.Range(Cells(1, j).Address, Cells(LastRow, j).Address).Value = FD.Range(Cells(1, j).Address, Cells(LastRow, j).Address).Value
+            Set DupeRng = Temp1.Cells(1, j).EntireColumn
+            DupeRng.RemoveDuplicates Columns:=1, Header:=xlNo
+            Vars.Add Temp1.Cells(1, j).Value
+        End If
+        
+        j = j + 1
+        
+    Loop
+    
+    ' set collections and add items
+    
+    Dim Makes       As New collection
+    Dim Models      As New collection
+    Dim Trims       As New collection
+    Dim Fuels       As New collection
+    Dim Bodies      As New collection
+    Dim MarkSeries  As New collection
+    Dim Trains      As New collection
+    Dim BHP         As New collection
+    Dim Trans       As New collection
+    Dim Packs       As New collection
+    Dim Doors       As New collection
+    Dim Trans_BHP   As New collection
+    
+    ColNum = Temp1.UsedRange.Columns(Temp1.UsedRange.Columns.count).Column
+    
+    j = 2
+    
+    Do Until j = ColNum - 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Makes.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Models.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Trims.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Fuels.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Bodies.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            MarkSeries.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Trains.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            BHP.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Trans.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Packs.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+        k = 2
+        
+        lastrow = Temp1.Cells(Temp1.Rows.count, j).End(xlUp).row
+        
+        Do Until k > lastrow
+            
+            Doors.Add Temp1.Cells(k, j).Value
+            
+            k = k + 1
+            
+        Loop
+        
+        j = j + 1
+        
+    Loop
+    
+    k = 2
+    
+    lastrow = Temp1.Cells(Temp1.Rows.count, 1).End(xlUp).row
+    
+    Do Until k > lastrow
+    
+        Trans_BHP.Add Temp1.Cells(k, 1).Value
+        
+        k = k + 1
+    
+    Loop
+    
+    ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    ' Produce body style checks data
+    
+    If Bodies.count > 1 Then
+        
+        For i = 1 To Bodies.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Bodies.item(i), "Bodies", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Bodies.item(i), "Bodies", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce auto checks data
+    
+    If Trans.count > 1 Then
+        
+        For i = 1 To Trans.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Trans.item(i), "Trans", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Trans.item(i), "Trans", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce drive train checks data
+    
+    If Trains.count > 1 Then
+        
+        For i = 1 To Trains.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Trains.item(i), "Trains", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Trains.item(i), "Trains", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce trim checks data
+    
+    If Trims.count > 1 Then
+        
+        For i = 1 To Trims.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Trims.item(i), "Trims", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Trims.item(i), "Trims", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce packs checks data
+    
+    If Packs.count > 1 Then
+        
+        For i = 1 To Packs.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Functions.remove_sql_punctuation(Packs.item(i)), "Packs", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Packs.item(i), "Packs", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce fuel checks data
+    
+    If Fuels.count > 1 Then
+        
+        For i = 1 To Fuels.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Fuels.item(i), "Fuels", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Fuels.item(i), "Fuels", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' Produce Trans BHP checks data
+    
+    If Trans_BHP.count > 1 Then
+    
+        For i = 1 To Trans_BHP.count
+            
+            Temp1.UsedRange.Clear
+            
+            strquery = Queries.ML_trim_walk_item_query(Trans_BHP.item(i), "Trans_BHP", FD.Name)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, Temp1.Name)
+            
+            strquery = Queries.ML_RV_comparison_query(Trans_BHP.item(i), "Trans_BHP", sheetname, CompFieldName)
+            
+            Call Functions.sql_to_excel(strquery, "excel", False, FD.Name, ColNum)
+            
+            ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+            
+        Next i
+        
+    End If
+    
+    ' format FD
+    
+    FD.Activate
+    
+    With ActiveWindow
+        .SplitColumn = 11
+        .SplitRow = 1
+    End With
+    
+    ActiveWindow.FreezePanes = True
+    
+    ColNum = FD.UsedRange.Columns(FD.UsedRange.Columns.count).Column
+    
+    With FD.Sort
+        .SortFields.Add Key:=FD.Range("C1"), Order:=xlAscending
+        .SortFields.Add Key:=FD.Range("D1"), Order:=xlAscending
+        .SortFields.Add Key:=FD.Range("E1"), Order:=xlAscending
+        .SortFields.Add Key:=FD.Range("F1"), Order:=xlAscending
+        .SortFields.Add Key:=FD.Range("H1"), Order:=xlAscending
+        .SortFields.Add Key:=FD.Range("I1"), Order:=xlAscending
+        .SetRange FD.UsedRange
+        .Header = xlYes
+        .Apply
+    End With
+    
+    FD.Cells.AutoFilter
+    FD.Range("1:" & ColNum).Columns.AutoFit
+    
+    Temp1.Delete
+    
+    'apply conditional formatting
+    Call Functions.Conditional_Formatting_Walks
+    
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+    
+    MsgBox Format((Timer - startingTime) / 86400, "hh:mm:ss")
+    
+End Sub
